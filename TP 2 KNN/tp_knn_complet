@@ -1,0 +1,364 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import time
+
+from sklearn.datasets import load_iris, load_wine, load_breast_cancer
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.neighbors import KNeighborsClassifier, KDTree
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+
+# ====================================================
+# Chargement dataset
+# ====================================================
+
+data = load_iris()
+X = data.data
+y = data.target
+# print("Dataset chargé :", data.DESCR[:200])
+
+# ====================================================
+# Split données
+# ====================================================
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,y,test_size=0.3,random_state=42
+)
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+# print("X_train",X_train)
+# print("X_test",X_test)
+
+# ====================================================
+# QUESTION 1
+# Implémentation KNN sans sklearn
+# ====================================================
+
+# print("\nQUESTION 1 : KNN FROM SCRATCH")
+
+def euclidean(a,b):
+    return np.sqrt(np.sum((a-b)**2))
+def knn_predict(X_train,y_train,X_test,k=3):
+    predictions=[]
+    for test in X_test:
+        distances=[]
+        for i in range(len(X_train)):
+            dist = euclidean(test,X_train[i])
+            distances.append((dist,y_train[i]))
+        distances.sort(key=lambda x:x[0])
+        neighbors = distances[:k]
+        labels=[n[1] for n in neighbors]
+        pred=max(set(labels),key=labels.count)
+        predictions.append(pred)
+    return np.array(predictions)
+y_pred = knn_predict(X_train,y_train,X_test,5)
+# print("Accuracy KNN scratch :",accuracy_score(y_test,y_pred))
+
+
+# ====================================================
+# QUESTION 2
+# Comparaison distances
+# ====================================================
+
+# print("\nQUESTION 2 : Comparaison distances")
+
+def manhattan(a,b):
+    return np.sum(np.abs(a-b))
+
+def cosine(a,b):
+    return 1 - (np.dot(a,b)/(np.linalg.norm(a)*np.linalg.norm(b)))
+
+# print("Distance euclidienne :",euclidean(X_train[0],X_train[1]))
+# print("Distance manhattan :",manhattan(X_train[0],X_train[1]))
+# print("Distance cosine :",cosine(X_train[0],X_train[1]))
+
+
+# ====================================================
+# QUESTION 3
+# Visualisation voisins
+# ====================================================
+
+# print("\nQUESTION 3 : Visualisation voisins")
+
+point = X_test[0]
+
+distances = [euclidean(point,x) for x in X_train]
+
+idx = np.argsort(distances)[:5]
+
+neighbors = X_train[idx]
+
+plt.scatter(X_train[:,0],X_train[:,1],c=y_train)
+plt.scatter(point[0],point[1],color="red",s=100,label="Test point")
+plt.scatter(neighbors[:,0],neighbors[:,1],color="yellow",label="Voisins")
+plt.legend()
+plt.title("KNN voisins")
+# plt.show()
+
+
+# ====================================================
+# QUESTION 4
+# Plusieurs datasets
+# ====================================================
+
+# print("\nQUESTION 4 : Comparaison datasets")
+
+datasets = {
+"Iris":load_iris(),
+"Wine":load_wine(),
+"BreastCancer":load_breast_cancer()
+}
+
+for name,d in datasets.items():
+
+    X=d.data
+    y=d.target
+
+    X_train,X_test,y_train,y_test = train_test_split(X,y,test_size=0.3)
+
+    model=KNeighborsClassifier(5)
+
+    model.fit(X_train,y_train)
+
+    pred=model.predict(X_test)
+
+    # print(name,"accuracy :",accuracy_score(y_test,pred))
+
+
+# ====================================================
+# QUESTION 5
+# Taille train
+# ====================================================
+
+# print("\nQUESTION 5 : Taille train")
+
+sizes=[0.2,0.4,0.6,0.8]
+
+data=load_iris()
+X=data.data
+y=data.target
+
+for s in sizes:
+
+    X_train,X_test,y_train,y_test=train_test_split(X,y,test_size=1-s)
+
+    model=KNeighborsClassifier(5)
+
+    model.fit(X_train,y_train)
+
+    acc=accuracy_score(y_test,model.predict(X_test))
+
+    # print("Train size",s,"Accuracy",acc)
+
+
+# ====================================================
+# QUESTION 6
+# Choix k
+# ====================================================
+
+# print("\nQUESTION 6 : Choix meilleur k")
+
+scores=[]
+k_values=range(1,21)
+for k in k_values:
+    model=KNeighborsClassifier(k)
+    model.fit(X_train,y_train)
+    scores.append(
+        accuracy_score(y_test,model.predict(X_test))
+    )
+best_k=k_values[np.argmax(scores)]
+# print("Meilleur k :",best_k)
+plt.plot(k_values,scores,marker='o')
+plt.xlabel("k")
+plt.ylabel("accuracy")
+# plt.show()
+
+
+# ====================================================
+# QUESTION 7
+# Vote pondéré
+# ====================================================
+
+# print("\nQUESTION 7 : Vote pondéré")
+
+model1=KNeighborsClassifier(5)
+
+model2=KNeighborsClassifier(5,weights="distance")
+
+model1.fit(X_train,y_train)
+model2.fit(X_train,y_train)
+
+acc1=accuracy_score(y_test,model1.predict(X_test))
+acc2=accuracy_score(y_test,model2.predict(X_test))
+
+# print("Accuracy normal :",acc1)
+# print("Accuracy pondéré :",acc2)
+
+
+# ====================================================
+# QUESTION 8
+# Frontière décision
+# ====================================================
+
+# print("\nQUESTION 8 : Frontières de décision")
+X=data.data[:,:2]
+y=data.target
+model=KNeighborsClassifier(5)
+model.fit(X,y)
+x_min,x_max=X[:,0].min()-1,X[:,0].max()+1
+y_min,y_max=X[:,1].min()-1,X[:,1].max()+1
+xx,yy=np.meshgrid(
+np.arange(x_min,x_max,0.1),
+np.arange(y_min,y_max,0.1)
+)
+Z=model.predict(np.c_[xx.ravel(),yy.ravel()])
+Z=Z.reshape(xx.shape)
+plt.contourf(xx,yy,Z,alpha=0.4)
+plt.scatter(X[:,0],X[:,1],c=y)
+plt.title("Frontière décision KNN")
+# plt.show()
+
+
+# ====================================================
+# QUESTION 9
+# Comparaison modèles
+# ====================================================
+
+# print("\nQUESTION 9 : Comparaison modèles")
+
+models={
+"KNN":KNeighborsClassifier(5),
+"DecisionTree":DecisionTreeClassifier(),
+"SVM":SVC(),
+"LogisticRegression":LogisticRegression(max_iter=1000)
+}
+
+for name,model in models.items():
+
+    model.fit(X_train,y_train)
+
+    acc=accuracy_score(y_test,model.predict(X_test))
+
+    # print(name,"accuracy :",acc)
+
+
+# ====================================================
+# QUESTION 10
+# erreurs
+# ====================================================
+
+# print("\nQUESTION 10 : exemples mal classés")
+
+model=KNeighborsClassifier(5)
+
+model.fit(X_train,y_train)
+
+pred=model.predict(X_test)
+
+errors=np.where(pred!=y_test)
+
+# print("Indices erreurs :",errors)
+
+
+# ====================================================
+# QUESTION 11
+# KNN regression
+# ====================================================
+
+# print("\nQUESTION 11 : KNN regression")
+
+def knn_regression(X_train,y_train,X_test,k=3):
+
+    preds=[]
+
+    for test in X_test:
+
+        dist=[euclidean(test,x) for x in X_train]
+
+        idx=np.argsort(dist)[:k]
+
+        preds.append(np.mean(y_train[idx]))
+
+    return np.array(preds)
+
+reg_pred=knn_regression(X_train,y_train,X_test)
+
+# print("Exemple prediction regression :",reg_pred[:5])
+
+
+# ====================================================
+# QUESTION 12
+# validation croisée
+# ====================================================
+
+# print("\nQUESTION 12 : validation croisée")
+
+model=KNeighborsClassifier(5)
+
+scores=cross_val_score(model,X,y,cv=5)
+
+# print("Scores CV :",scores)
+
+# print("Moyenne :",scores.mean())
+
+
+# ====================================================
+# QUESTION 13
+# KDTree
+# ====================================================
+
+print("\nQUESTION 13 : KDTree")
+
+start=time.time()
+
+tree=KDTree(X_train)
+
+tree.query(X_test,k=5)
+
+end=time.time()
+
+print("Temps KDTree :",end-start)
+
+
+# ====================================================
+# QUESTION 14
+# bruit
+# ====================================================
+
+print("\nQUESTION 14 : bruit")
+
+noise=np.random.normal(0,0.5,X.shape)
+
+X_noisy=X+noise
+
+model=KNeighborsClassifier(5)
+
+model.fit(X_noisy,y)
+
+pred=model.predict(X_noisy)
+
+print("Accuracy avec bruit :",accuracy_score(y,pred))
+
+
+# ====================================================
+# QUESTION 15
+# interaction simple
+# ====================================================
+
+print("\nQUESTION 15 : mini interaction")
+
+plt.scatter(X[:,0],X[:,1],c=y)
+
+print("Clique sur un point dans le graphique")
+
+point=plt.ginput(1)
+
+print("Point sélectionné :",point)
+
+plt.show()
