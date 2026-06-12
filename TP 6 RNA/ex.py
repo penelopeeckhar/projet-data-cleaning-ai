@@ -5,7 +5,7 @@
 # ── 2. Importation du Dataset ──────────────────────────────
 import pandas as pd
 
-train = pd.read_csv(r'C:\Users\saidm\Documents\IA mercredi\TP6\titanic\train.csv')
+train = pd.read_csv(r'CHEMIN\train.csv')
 print(train.head())
 
 # ── 3. Prétraitement ───────────────────────────────────────
